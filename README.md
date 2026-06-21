@@ -5,17 +5,22 @@ A cleaned **image-classification** dataset of real hands for the Edge ML (TinyML
 `training/` and `testing/`, ready to upload to Edge Impulse.
 
 ```
-training/  rock/ paper/ scissors/      # 4,051 images
-testing/   rock/ paper/ scissors/      #   190 images
+training/  rock/ paper/ scissors/      # 1,877 images
+testing/   rock/ paper/ scissors/      #   470 images
 ```
 
-| split | rock | paper | scissors |
-|---|---|---|---|
-| training | 1708 | 1171 | 1172 |
-| testing | 63 | 65 | 62 |
+| split | rock | paper | scissors | total |
+|---|---|---|---|---|
+| training | 740 | 553 | 584 | 1877 |
+| testing | 181 | 162 | 127 | 470 |
 
-Images are JPEG, square-ish crops centered on a single hand (so they fit a 96×96 RGB impulse
-without distortion).
+≈80/20 split. Images are JPEG, square-ish crops centered on a single hand (so they fit a
+96×96 RGB impulse without distortion).
+
+**Leakage-safe split.** Many source images are frames sampled from the same videos. The
+train/test split is **grouped by source clip** — every frame of a given clip is in *one*
+split only — so the test accuracy isn't inflated by near-duplicate frames. To reduce that
+redundancy, each source clip is also **capped at 60 images** (sharpest kept).
 
 ## How to load it into Edge Impulse (CLI)
 
@@ -44,10 +49,14 @@ that all three classes appear in both Training and Testing.
    image (square, +15% context margin) so a *detection* dataset becomes a *classification*
    dataset.
 3. **Quality clean:** crops were scored for sharpness (variance-of-Laplacian) and size; the
-   blurriest/smallest ~12% (sharpness < 60 or min-dimension < 90 px) were removed. The
-   reproducible scripts live in the course repo under
-   `Projects/Vision_RPS/Dataset/` (`crop_boxes_to_classification.py`, `quality_audit.py`,
-   `apply_cleaning.py`).
+   blurriest/smallest ~12% (sharpness < 60 or min-dimension < 90 px) were removed.
+4. **Dedup + leakage-safe split:** each source clip was capped at 60 images (sharpest kept)
+   to cut near-duplicate frames, then split ~80/20 **grouped by source clip** so no clip
+   appears in both train and test.
+
+The reproducible scripts live in the course repo under `Projects/Vision_RPS/Dataset/`
+(`crop_boxes_to_classification.py`, `quality_audit.py`, `apply_cleaning.py`,
+`resplit_dedup.py`).
 
 ## Known limitation (a teaching point)
 
