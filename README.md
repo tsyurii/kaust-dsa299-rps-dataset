@@ -58,4 +58,12 @@ This is Day 5, Session 4.
 
 ## License
 
-Derived work; see `ATTRIBUTION.md` for the source dataset's license and credit.
+**CDLA-Sharing-1.0** (Community Data License Agreement – Sharing, Version 1.0) — see
+`LICENSE`. This is a **derived/cleaned** version of the CDLA-Sharing-licensed
+"Rock Paper Scissors SXSW" dataset, so it's published under the **same** share-alike
+Agreement. Free to use (including commercially) and re-publish, provided you keep the
+attribution (`ATTRIBUTION.md`) and change notice (`NOTICE.md`), include the `LICENSE` text,
+and publish any further changes under CDLA-Sharing-1.0. See `ATTRIBUTION.md` for source
+credit and `NOTICE.md` for exactly what was changed.
+
+`SPDX-License-Identifier: CDLA-Sharing-1.0`
