@@ -1,0 +1,11 @@
+# macOS
+.DS_Store
+
+# Python / tooling artifacts (in case scripts are copied here)
+__pycache__/
+*.pyc
+_audit/
+audit.csv
+
+# never commit quarantined rejects
+_rejected/
