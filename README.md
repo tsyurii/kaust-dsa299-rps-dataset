@@ -15,7 +15,8 @@ testing/   rock/ paper/ scissors/      #   470 images
 | testing | 181 | 162 | 127 | 470 |
 
 ≈80/20 split. Images are JPEG, square-ish crops centered on a single hand (so they fit a
-96×96 RGB impulse without distortion).
+96×96 RGB impulse without distortion). Each file is named **`<class>.<original>.jpg`**
+(e.g. `rock.0001_….jpg`) so Edge Impulse can **infer the label from the filename**.
 
 **Leakage-safe split.** Many source images are frames sampled from the same videos. The
 train/test split is **grouped by source clip** — every frame of a given clip is in *one*
@@ -26,20 +27,34 @@ redundancy, each source clip is also **capped at 60 images** (sharpest kept).
 
 This is the course's **third data-ingestion method** (Day 1 motion = CLI data-forwarder,
 KWS = Studio web upload, RPS = repo + CLI uploader). Install the Edge Impulse CLI first
-(see the course `Prerequisites_Setup_Guide.md`), then:
+(see the course `Prerequisites_Setup_Guide.md`).
+
+**First, in Studio:** create the project and set **Dashboard → Labeling method → "One label
+per data item"** (image classification). If it's left on *object detection* (bounding boxes),
+uploads arrive **unlabeled (`-`)**.
+
+**Then upload** with the cross-platform helper (works on Windows / macOS / Linux — it globs
+the files and uploads in chunks):
 
 ```bash
 git clone <this-repo-url>
 cd kaust-dsa299-rps-dataset
 
-edge-impulse-uploader --api-key ei_xxxxxxxx          # key: Studio → Dashboard → Keys
-edge-impulse-uploader --category training --directory training
-edge-impulse-uploader --category testing  --directory testing
+edge-impulse-uploader --clean        # log in + pick your project (once)
+python upload_rps.py                  # uploads all 6 class folders, labeled
 ```
 
-Labels are inferred from the folder names (`rock`/`paper`/`scissors`); uploading each split
-with `--category` preserves the train/test split. Confirm in **Studio → Data acquisition**
-that all three classes appear in both Training and Testing.
+Confirm in **Studio → Data acquisition** that all three classes appear in both Training and
+Testing, with counts matching the table above.
+
+> ⚠️ **Don't use `--directory`** — the uploader (v1.39.x) can't parse the nested
+> `training/testing ÷ class` layout (`EISDIR` at the repo root, "format not recognised" at a
+> split). **Don't rely on Studio's web drag-and-drop** for the full set either — it can
+> silently drop files on large batches. The helper is the reliable, complete path.
+>
+> *macOS/Linux/Git-Bash only:* the shell expands globs, so you can instead run six
+> `edge-impulse-uploader --category <split> --label <class> <split>/<class>/*.jpg` commands.
+> (Windows cmd/PowerShell don't expand `*.jpg`, which is why the helper exists.)
 
 ## How this dataset was built
 
