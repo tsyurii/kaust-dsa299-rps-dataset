@@ -2,10 +2,11 @@
 """
 upload_rps.py — upload the Rock-Paper-Scissors dataset to Edge Impulse.
 
-Cross-platform (Windows / macOS / Linux). Solves the two things that bite the bare
+Cross-platform (Windows / macOS / Linux). Solves the things that bite the bare
 `edge-impulse-uploader ... *.jpg` command:
-  * Windows cmd/PowerShell don't expand `*.jpg` -> Python globs the files itself.
-  * Huge file lists blow past the OS command-line length limit -> uploads in chunks.
+  * Windows cmd/PowerShell don't expand `*.jpg`  -> Python globs the files itself.
+  * cmd.exe caps a command line at ~8191 chars    -> uploads in LENGTH-BOUNDED batches
+    (a fixed file count overflows that limit and silently truncates -> partial upload).
 
 It walks training/ and testing/, each containing rock/ paper/ scissors/ folders, and
 uploads every .jpg with the correct --category (train/test) and --label (class name).
@@ -37,6 +38,10 @@ import sys
 CLASSES = ["rock", "paper", "scissors"]
 SPLITS = ["training", "testing"]
 
+# Keep each command line safely under cmd.exe's ~8191-char limit on Windows.
+# Other shells allow far more, so the cap only really matters on Windows.
+MAX_CMDLINE = 7000 if os.name == "nt" else 120000
+
 
 def find_dataset(explicit):
     here = os.path.dirname(os.path.abspath(__file__))
@@ -48,16 +53,27 @@ def find_dataset(explicit):
              "Run this from the dataset repo, or pass --dataset PATH.")
 
 
-def chunks(items, n):
-    for i in range(0, len(items), n):
-        yield items[i:i + n]
+def length_batches(files, base_len, cap):
+    """Yield batches whose rendered command line stays under `cap` chars."""
+    batch, cur = [], base_len
+    for f in files:
+        add = len(f) + 3  # quotes + separator
+        if batch and cur + add > cap:
+            yield batch
+            batch, cur = [], base_len
+        batch.append(f)
+        cur += add
+    if batch:
+        yield batch
 
 
 def run_uploader(args_list):
-    # On Windows the CLI is edge-impulse-uploader.cmd -> needs the shell to resolve it.
-    cmd = ["edge-impulse-uploader"] + args_list
+    full = ["edge-impulse-uploader"] + args_list
     try:
-        return subprocess.run(cmd, shell=(os.name == "nt")).returncode
+        if os.name == "nt":
+            # Run via cmd.exe (needed for the .cmd shim) with a properly quoted STRING.
+            return subprocess.run(subprocess.list2cmdline(full), shell=True).returncode
+        return subprocess.run(full).returncode
     except FileNotFoundError:
         sys.exit("edge-impulse-uploader not found. Install it:\n"
                  "    npm install -g edge-impulse-cli")
@@ -67,7 +83,8 @@ def main():
     ap = argparse.ArgumentParser(description="Upload the RPS dataset to Edge Impulse.")
     ap.add_argument("--dataset", help="path to the dataset repo (default: current folder)")
     ap.add_argument("--api-key", help="EI API key (else uses your cached `--clean` login)")
-    ap.add_argument("--chunk", type=int, default=100, help="files per upload call (default 100)")
+    ap.add_argument("--max-chars", type=int, default=MAX_CMDLINE,
+                    help=f"max command-line length per call (default {MAX_CMDLINE})")
     args = ap.parse_args()
 
     base = find_dataset(args.dataset)
@@ -80,15 +97,16 @@ def main():
             if not files:
                 print(f"[skip] {split}/{cls}: no .jpg found")
                 continue
-            print(f"[{split}/{cls}] uploading {len(files)} files...")
-            for batch in chunks(files, args.chunk):
-                call = ["--category", split, "--label", cls]
-                if args.api_key:
-                    call += ["--api-key", args.api_key]
-                call += batch
-                rc = run_uploader(call)
+            fixed = ["--category", split, "--label", cls]
+            if args.api_key:
+                fixed += ["--api-key", args.api_key]
+            base_len = len(subprocess.list2cmdline(["edge-impulse-uploader"] + fixed)) + 1
+            batches = list(length_batches(files, base_len, args.max_chars))
+            print(f"[{split}/{cls}] {len(files)} files in {len(batches)} batch(es)...")
+            for bi, batch in enumerate(batches, 1):
+                rc = run_uploader(fixed + batch)
                 if rc != 0:
-                    print(f"  note: a batch in {split}/{cls} returned {rc} "
+                    print(f"  note: {split}/{cls} batch {bi}/{len(batches)} returned {rc} "
                           f"(usually duplicates already in the project -- safe to ignore).")
             grand_total += len(files)
 
